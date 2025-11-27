@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1004541649878",
+    "project_id": "aboganet-98cd2",
+    "storage_bucket": "aboganet-98cd2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1004541649878:android:95cd993e3b70f37f52ba77",
+        "android_client_info": {
+          "package_name": "com.example.aboganet2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChPxNQQJEi3ENlZ9QHDoQWdTHgL_OqFKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
