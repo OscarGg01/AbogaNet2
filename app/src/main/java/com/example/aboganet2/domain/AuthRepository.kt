@@ -23,15 +23,20 @@ class AuthRepository {
         }
     }
 
-    suspend fun registerUser(user: User, password: String): Result<Unit> {
+    suspend fun registerUser(user: User, password: String): Result<String> {
         return try {
-            val authResult = firebaseAuth.createUserWithEmailAndPassword(user.email, password).await()
-            val firebaseUser = authResult.user ?: throw Exception("Error al crear el usuario.")
+            val authResult = firebaseAuth.createUserWithEmailAndPassword( user. email,  password).await()
+            val firebaseUser = authResult.user
 
-            val userWithId = user.copy(uid = firebaseUser.uid)
-            firestore.collection("users").document(firebaseUser.uid).set(userWithId).await()
-
-            Result.success(Unit)
+            if (firebaseUser != null) {
+                val userWithUid = user.copy(uid = firebaseUser.uid)
+                firestore.collection("users").document(firebaseUser.uid)
+                    .set(userWithUid)
+                    .await()
+                Result.success(user.rol)
+            } else {
+                Result.failure(Exception("No se pudo crear el usuario en Firebase."))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }

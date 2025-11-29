@@ -109,10 +109,14 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             val result = authRepository.registerUser(user, password)
-            result.onSuccess {
-                _authState.value = AuthState.RegistrationSuccess
+            result.onSuccess { role ->
+                // --- CAMBIO CLAVE ---
+                // En lugar de emitir un estado de registro separado,
+                // emitimos el mismo estado de éxito que el login.
+                // La UI (AppNavigation) ya sabe cómo reaccionar a este estado.
+                _authState.value = AuthState.Success(role)
             }.onFailure {
-                _authState.value = AuthState.Error(it.message ?: "Error desconocido")
+                _authState.value = AuthState.Error(it.message ?: "Error desconocido en el registro")
             }
         }
     }

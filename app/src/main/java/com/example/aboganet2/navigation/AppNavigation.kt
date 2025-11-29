@@ -74,13 +74,6 @@ fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
                 }
                 authViewModel.resetAuthState()
             }
-            is AuthState.RegistrationSuccess -> {
-                Toast.makeText(context, "Registro exitoso. Por favor, inicia sesión.", Toast.LENGTH_LONG).show()
-                navController.navigate(AppRoutes.LOGIN_SCREEN) {
-                    popUpTo(AppRoutes.LOGIN_SCREEN) { inclusive = true }
-                }
-                authViewModel.resetAuthState()
-            }
             is AuthState.Error -> {
                 Toast.makeText(context, state.message, Toast.LENGTH_SHORT).show()
                 authViewModel.resetAuthState()
