@@ -2,13 +2,14 @@ package com.example.aboganet2.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.aboganet2.data.FullLawyerProfile
+import com.example.aboganet2.data.LawyerProfile
 import com.example.aboganet2.data.User
 import com.example.aboganet2.domain.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-// Estados para el flujo de login/registro
 sealed class AuthState {
     object Idle : AuthState()
     object Loading : AuthState()
@@ -17,7 +18,6 @@ sealed class AuthState {
     object RegistrationSuccess : AuthState()
 }
 
-// Estados para la comprobación de sesión al inicio de la app
 sealed class SessionState {
     object Loading : SessionState()
     data class LoggedIn(val role: String) : SessionState()
@@ -28,7 +28,6 @@ class AuthViewModel : ViewModel() {
 
     private val authRepository = AuthRepository()
 
-    // --- ESTADOS ---
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState
 
@@ -38,13 +37,51 @@ class AuthViewModel : ViewModel() {
     private val _userProfile = MutableStateFlow<User?>(null)
     val userProfile: StateFlow<User?> = _userProfile
 
+    private val _fullLawyerProfile = MutableStateFlow(FullLawyerProfile())
+    val fullLawyerProfile: StateFlow<FullLawyerProfile> = _fullLawyerProfile
 
-    // --- FUNCIONES ---
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
 
-    /**
-     * Comprueba si hay una sesión activa al iniciar la app.
-     * Actualiza el sessionState a LoggedIn(role) o LoggedOut.
-     */
+    private val _availableLawyers = MutableStateFlow<List<FullLawyerProfile>>(emptyList())
+    val availableLawyers: StateFlow<List<FullLawyerProfile>> = _availableLawyers
+
+    fun fetchFullLawyerProfile() {
+        val uid = authRepository.getCurrentUserId() ?: return
+        // Ahora llama a la nueva función con el ID del usuario actual
+        fetchLawyerProfileById(uid)
+    }
+
+    // CAMBIA EL NOMBRE DE ESTA FUNCIÓN
+    fun fetchLawyerProfileById(userId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _fullLawyerProfile.value = FullLawyerProfile() // Limpiamos el perfil anterior
+
+            val basicInfoResult = authRepository.getUserProfile(userId)
+            val professionalInfoResult = authRepository.getLawyerProfile(userId)
+
+            _fullLawyerProfile.value = FullLawyerProfile(
+                basicInfo = basicInfoResult.getOrNull(),
+                professionalInfo = professionalInfoResult.getOrNull()
+            )
+            _isLoading.value = false
+        }
+    }
+
+    fun saveLawyerProfile(profile: LawyerProfile) {
+        val uid = authRepository.getCurrentUserId() ?: return
+
+        viewModelScope.launch {
+            _isLoading.value = true
+            val result = authRepository.saveLawyerProfile(uid, profile)
+            result.onSuccess {
+                fetchFullLawyerProfile()
+            }.onFailure {
+            }
+        }
+    }
+
     fun checkActiveSession() {
         viewModelScope.launch {
             val role = authRepository.getCurrentUserRole()
@@ -56,10 +93,6 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Inicia sesión con email y contraseña.
-     * En caso de éxito, obtiene el rol del usuario y lo emite en authState.
-     */
     fun login(email: String, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -72,9 +105,6 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Registra un nuevo usuario en Firebase Auth y Firestore.
-     */
     fun register(user: User, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
@@ -87,12 +117,15 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Obtiene los datos del perfil del usuario actualmente logueado desde Firestore.
-     */
     fun fetchUserProfile() {
         viewModelScope.launch {
-            val result = authRepository.getUserProfile()
+            val uid = authRepository.getCurrentUserId()
+            if (uid == null) {
+                _authState.value = AuthState.Error("No hay un usuario autenticado.")
+                return@launch
+            }
+
+            val result = authRepository.getUserProfile(uid)
             result.onSuccess { user ->
                 _userProfile.value = user
             }.onFailure {
@@ -101,16 +134,12 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Actualiza la URL de la foto de perfil en Firestore.
-     * Si tiene éxito, vuelve a cargar el perfil para refrescar la UI.
-     */
     fun updateUserProfilePicture(newUrl: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             val result = authRepository.updateProfilePictureUrl(newUrl)
             result.onSuccess {
-                fetchUserProfile() // Refresca los datos del perfil
+                fetchUserProfile()
                 _authState.value = AuthState.Idle
             }.onFailure {
                 _authState.value = AuthState.Error(it.message ?: "Error al actualizar la foto.")
@@ -118,16 +147,24 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Cierra la sesión del usuario actual en Firebase.
-     */
+    fun fetchAllActiveLawyers() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            // Llamamos a la nueva función del repositorio
+            val result = authRepository.getAllActiveLawyers()
+            result.onSuccess { lawyers ->
+                _availableLawyers.value = lawyers
+            }.onFailure {
+                // Manejar el error
+            }
+            _isLoading.value = false
+        }
+    }
+
     fun logout() {
         authRepository.logout()
     }
 
-    /**
-     * Resetea el authState a Idle para evitar que se muestren mensajes de error/éxito antiguos.
-     */
     fun resetAuthState() {
         _authState.value = AuthState.Idle
     }

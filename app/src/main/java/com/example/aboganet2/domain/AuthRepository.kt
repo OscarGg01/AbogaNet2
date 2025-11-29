@@ -1,5 +1,7 @@
 package com.example.aboganet2.domain
 
+import com.example.aboganet2.data.FullLawyerProfile
+import com.example.aboganet2.data.LawyerProfile
 import com.example.aboganet2.data.User
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -10,15 +12,57 @@ class AuthRepository {
     private val firebaseAuth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
+    suspend fun getLawyerProfile(userId: String): Result<LawyerProfile> {
+        return try {
+            val document = firestore.collection("lawyer_profiles").document(userId).get().await()
+            val profile = document.toObject(LawyerProfile::class.java)
+                ?: throw Exception("No se encontraron los datos profesionales del abogado.")
+            Result.success(profile)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun registerUser(user: User, password: String): Result<Unit> {
         return try {
             val authResult = firebaseAuth.createUserWithEmailAndPassword(user.email, password).await()
             val firebaseUser = authResult.user ?: throw Exception("Error al crear el usuario.")
 
-            val userWithId = user.copy(id = firebaseUser.uid)
+            val userWithId = user.copy(uid = firebaseUser.uid)
             firestore.collection("users").document(firebaseUser.uid).set(userWithId).await()
 
             Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getAllActiveLawyers(): Result<List<FullLawyerProfile>> {
+        return try {
+            val activeLawyers = mutableListOf<FullLawyerProfile>()
+
+            val userProfiles = firestore.collection("users")
+                .whereEqualTo("rol", "abogado")
+                .whereEqualTo("estado", "activo")
+                .get()
+                .await()
+
+            for (userDoc in userProfiles.documents) {
+                val basicInfo = userDoc.toObject(User::class.java)
+                if (basicInfo != null) {
+                    val userId = userDoc.id
+                    val profileDoc = firestore.collection("lawyer_profiles").document(userId).get().await()
+
+                    val professionalInfo = if (profileDoc.exists()) {
+                        profileDoc.toObject(LawyerProfile::class.java)
+                    } else {
+                        LawyerProfile()
+                    }
+
+                    activeLawyers.add(FullLawyerProfile(basicInfo, professionalInfo))
+                }
+            }
+            Result.success(activeLawyers)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -50,14 +94,11 @@ class AuthRepository {
         }
     }
 
-    suspend fun getUserProfile(): Result<User> {
+    suspend fun getUserProfile(userId: String): Result<User> {
         return try {
-            val userId = firebaseAuth.currentUser?.uid ?: throw Exception("Usuario no autenticado.")
-
             val document = firestore.collection("users").document(userId).get().await()
-
-            val user = document.toObject(User::class.java) ?: throw Exception("No se encontraron los datos del perfil.")
-
+            val user = document.toObject(User::class.java)
+                ?: throw Exception("No se encontraron los datos del perfil.")
             Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)
@@ -65,30 +106,37 @@ class AuthRepository {
     }
 
     suspend fun getCurrentUserRole(): String? {
-        val firebaseUser = firebaseAuth.currentUser ?: return null // Si no hay usuario, devuelve null
+        val firebaseUser = firebaseAuth.currentUser ?: return null
 
         return try {
             val userDocument = firestore.collection("users").document(firebaseUser.uid).get().await()
             if (!userDocument.exists() || userDocument.getString("estado") != "activo") {
-                firebaseAuth.signOut() // Limpiamos la sesión si los datos son inválidos
+                firebaseAuth.signOut()
                 return null
             }
-            userDocument.getString("rol")
+            userDocument.getString("role")
         } catch (e: Exception) {
-            null // Si hay cualquier error, tratamos como si no hubiera sesión
+            null
         }
     }
 
     suspend fun updateProfilePictureUrl(newUrl: String): Result<Unit> {
         return try {
-            // 1. Obtenemos el ID del usuario actual
             val userId = firebaseAuth.currentUser?.uid ?: throw Exception("Usuario no autenticado.")
-
-            // 2. Actualizamos solo el campo "fotoUrl" en el documento correspondiente
             firestore.collection("users").document(userId)
                 .update("fotoUrl", newUrl)
                 .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
+    suspend fun saveLawyerProfile(userId: String, profile: LawyerProfile): Result<Unit> {
+        return try {
+            firestore.collection("lawyer_profiles").document(userId)
+                .set(profile)
+                .await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -97,5 +145,9 @@ class AuthRepository {
 
     fun logout() {
         firebaseAuth.signOut()
+    }
+
+    fun getCurrentUserId(): String? {
+        return firebaseAuth.currentUser?.uid
     }
 }
