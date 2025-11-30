@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
@@ -18,7 +19,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -37,6 +43,17 @@ val lawSpecialties = listOf(
     "Propiedad Intelectual", "Derecho Informático"
 )
 
+class CurrencyVisualTransformation(private val prefix: String = "S/ ") : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val out = prefix + text.text
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int = offset + prefix.length
+            override fun transformedToOriginal(offset: Int): Int = (offset - prefix.length).coerceAtLeast(0)
+        }
+        return TransformedText(AnnotatedString(out), offsetMapping)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LawyerProfileScreen(
@@ -44,9 +61,10 @@ fun LawyerProfileScreen(
     onNavigateBack: () -> Unit
 ) {
     val fullProfile by authViewModel.fullLawyerProfile.collectAsState()
-    val isLoading by authViewModel.isLoading.collectAsState()
 
     var isEditing by remember { mutableStateOf(false) }
+    var costoConsultaInput by remember { mutableStateOf("") }
+    var costoConsulta by remember { mutableStateOf<Double?>(null) }
     var disponibilidad by remember { mutableStateOf(false) }
     var fotoUrl by remember { mutableStateOf("") }
     var especialidad by remember { mutableStateOf("") }
@@ -61,6 +79,8 @@ fun LawyerProfileScreen(
             fotoUrl = it.fotoUrl
         }
         fullProfile.professionalInfo?.let {
+            costoConsulta = it.costoConsulta
+            costoConsultaInput = it.costoConsulta?.toString() ?: ""
             disponibilidad = it.disponibilidad
             especialidad = it.especialidad
             logros = it.logros
@@ -86,6 +106,7 @@ fun LawyerProfileScreen(
                     if (isEditing) {
                         IconButton(onClick = {
                             val updatedProfile = LawyerProfile(
+                                costoConsulta = costoConsultaInput.toDoubleOrNull(),
                                 disponibilidad = disponibilidad,
                                 especialidad = especialidad,
                                 logros = logros,
@@ -135,6 +156,21 @@ fun LawyerProfileScreen(
                     }
                     item {
                         OutlinedTextField(
+                            value = costoConsultaInput,
+                            onValueChange = { newValue ->
+                                if (newValue.matches(Regex("^\\d*\\.?\\d*\$"))) {
+                                    costoConsultaInput = newValue
+                                }
+                            },
+                            label = { Text("Costo por Consulta") },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            visualTransformation = CurrencyVisualTransformation()
+                        )
+                    }
+                    item {
+                        OutlinedTextField(
                             value = fotoUrl,
                             onValueChange = { fotoUrl = it },
                             label = { Text("URL de la Foto de Perfil") },
@@ -153,6 +189,8 @@ fun LawyerProfileScreen(
                     }
                     item { SectionWithAddButton("Educación") { showEducationDialog = true } }
                 } else {
+                    val costoFormatted = costoConsulta?.let { "S/ %.2f".format(it) } ?: "No establecido"
+                    item { ProfileStaticSection("Tarifa por Consulta", costoFormatted) }
                     item { ProfileStaticSection("Especialidad", especialidad) }
                     item { ProfileStaticSection("Logros y Resumen", logros) }
                     item { SectionTitle("Educación") }
@@ -239,9 +277,7 @@ fun AvailabilitySwitch(isAvailable: Boolean, onCheckedChange: (Boolean) -> Unit)
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {

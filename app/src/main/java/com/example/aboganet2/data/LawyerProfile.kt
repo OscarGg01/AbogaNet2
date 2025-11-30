@@ -14,6 +14,7 @@ data class ExperienceItem(
 
 data class LawyerProfile(
     val disponibilidad: Boolean = false,
+    val costoConsulta: Double? = null,
     val especialidad: String = "",
     val logros: String = "",
     val educacion: List<EducationItem> = emptyList(),

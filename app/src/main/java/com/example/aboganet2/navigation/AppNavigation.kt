@@ -23,6 +23,10 @@ object AppRoutes {
     const val SPLASH_SCREEN = "splash"
     const val LAWYER_PROFILE_SCREEN = "lawyer_profile"
     const val LAWYER_DETAIL_SCREEN = "lawyer_detail"
+    const val PAYMENT_SCREEN = "payment"
+    const val CONSULTATION_SCREEN = "consultation"
+    const val CONSULTATION_FORM_SCREEN = "consultation_form"
+    const val CHAT_SCREEN = "chat"
 }
 
 @Composable
@@ -155,9 +159,81 @@ fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
                 LawyerDetailScreen(
                     lawyerId = lawyerId,
                     authViewModel = authViewModel,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToPayment = { lawyerName, lawyerIdArg, cost ->
+                        navController.navigate("${AppRoutes.PAYMENT_SCREEN}/$lawyerName/$lawyerIdArg/$cost")
+                    }
                 )
             }
+        }
+
+        composable(
+            route = AppRoutes.PAYMENT_SCREEN + "/{lawyerName}/{lawyerId}/{cost}",
+            arguments = listOf(
+                navArgument("lawyerName") { type = NavType.StringType },
+                navArgument("lawyerId") { type = NavType.StringType },
+                navArgument("cost") { type = NavType.FloatType }
+            )
+        ) { backStackEntry ->
+            val lawyerName = backStackEntry.arguments?.getString("lawyerName") ?: ""
+            val lawyerId = backStackEntry.arguments?.getString("lawyerId") ?: ""
+            val cost = backStackEntry.arguments?.getFloat("cost") ?: 0f
+            PaymentScreen(
+                lawyerName = lawyerName,
+                cost = cost.toDouble(),
+                onNavigateBack = { navController.popBackStack() },
+                onPaymentSuccess = {
+                    navController.navigate("${AppRoutes.CONSULTATION_SCREEN}/$lawyerId/${cost.toDouble()}") {
+                        popUpTo(AppRoutes.CLIENT_HOME_SCREEN)
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = AppRoutes.CONSULTATION_SCREEN + "/{lawyerId}/{cost}",
+            arguments = listOf(
+                navArgument("lawyerId") { type = NavType.StringType },
+                navArgument("cost") { type = NavType.FloatType }
+            )
+        ) { backStackEntry ->
+            val lawyerId = backStackEntry.arguments?.getString("lawyerId") ?: ""
+            val cost = backStackEntry.arguments?.getFloat("cost") ?: 0f
+            ConsultationScreen(
+                onGoToConsultation = {
+                    navController.navigate("${AppRoutes.CONSULTATION_FORM_SCREEN}/$lawyerId/${cost.toDouble()}")
+                }
+            )
+        }
+
+        composable(
+            route = AppRoutes.CONSULTATION_FORM_SCREEN + "/{lawyerId}/{cost}",
+            arguments = listOf(
+                navArgument("lawyerId") { type = NavType.StringType },
+                navArgument("cost") { type = NavType.FloatType }
+            )
+        ) { backStackEntry ->
+            val lawyerId = backStackEntry.arguments?.getString("lawyerId") ?: ""
+            val cost = backStackEntry.arguments?.getFloat("cost") ?: 0f
+            ConsultationFormScreen(
+                lawyerId = lawyerId,
+                cost = cost.toDouble(),
+                authViewModel = authViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onSubmissionSuccess = {
+                    navController.navigate(AppRoutes.CHAT_SCREEN) {
+                        popUpTo(AppRoutes.CLIENT_HOME_SCREEN)
+                    }
+                }
+            )
+        }
+
+        composable(route = AppRoutes.CHAT_SCREEN) {
+            ChatScreen(onNavigateBack = {
+                navController.navigate(AppRoutes.CLIENT_HOME_SCREEN) {
+                    popUpTo(AppRoutes.CLIENT_HOME_SCREEN) { inclusive = true }
+                }
+            })
         }
     }
 }

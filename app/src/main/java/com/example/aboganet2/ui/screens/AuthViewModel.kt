@@ -2,6 +2,7 @@ package com.example.aboganet2.ui.screens
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.aboganet2.data.Consultation
 import com.example.aboganet2.data.FullLawyerProfile
 import com.example.aboganet2.data.LawyerProfile
 import com.example.aboganet2.data.User
@@ -45,6 +46,24 @@ class AuthViewModel : ViewModel() {
 
     private val _availableLawyers = MutableStateFlow<List<FullLawyerProfile>>(emptyList())
     val availableLawyers: StateFlow<List<FullLawyerProfile>> = _availableLawyers
+
+    private val _consultationState = MutableStateFlow<Boolean?>(null)
+    val consultationState: StateFlow<Boolean?> = _consultationState
+
+    fun submitConsultation(consultation: Consultation) {
+        viewModelScope.launch {
+            val result = authRepository.submitConsultation(consultation)
+            _consultationState.value = result.isSuccess
+        }
+    }
+
+    fun getCurrentUserId(): String? {
+        return authRepository.getCurrentUserId()
+    }
+
+    fun resetConsultationState() {
+        _consultationState.value = null
+    }
 
     fun fetchFullLawyerProfile() {
         val uid = authRepository.getCurrentUserId() ?: return

@@ -1,5 +1,7 @@
 package com.example.aboganet2.domain
 
+import androidx.compose.animation.core.copy
+import com.example.aboganet2.data.Consultation
 import com.example.aboganet2.data.FullLawyerProfile
 import com.example.aboganet2.data.LawyerProfile
 import com.example.aboganet2.data.User
@@ -37,6 +39,18 @@ class AuthRepository {
             } else {
                 Result.failure(Exception("No se pudo crear el usuario en Firebase."))
             }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun submitConsultation(consultation: Consultation): Result<Unit> {
+        return try {
+            // Creamos un nuevo documento en la colección 'consultations'
+            val document = firestore.collection("consultations").document()
+            // Guardamos la consulta con el ID del documento asignado
+            document.set(consultation.copy(id = document.id)).await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
