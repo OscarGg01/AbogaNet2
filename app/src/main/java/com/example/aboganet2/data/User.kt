@@ -11,7 +11,7 @@ data class User(
     val telefono: String = "",
     val direccion: String = "",
     val fotoUrl: String = "",
-    val rol: String = "abogado",
+    val rol: String = "cliente",
     val estado: String = "activo",
     @ServerTimestamp
     val createdAt: Date? = null
