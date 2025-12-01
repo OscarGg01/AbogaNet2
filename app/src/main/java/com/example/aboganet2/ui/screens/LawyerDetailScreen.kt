@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -109,8 +111,24 @@ fun LawyerDetailScreen(
                 item { ProfileHeader(profile = fullProfile, isAvailable = professionalInfo.disponibilidad) }
                 item { Spacer(modifier = Modifier.height(24.dp)) }
 
+                // --- INICIO DE LA MODIFICACIÓN ---
+                val diasAtencionTexto = if (professionalInfo.diasAtencion.isNotEmpty()) {
+                    professionalInfo.diasAtencion.joinToString(", ")
+                } else {
+                    "No establecido"
+                }
+                val horarioTexto = if (professionalInfo.horarioInicio.isNotBlank() && professionalInfo.horarioFin.isNotBlank()) {
+                    "${professionalInfo.horarioInicio} - ${professionalInfo.horarioFin}"
+                } else {
+                    "No establecido"
+                }
                 val costoFormatted = professionalInfo.costoConsulta?.let { "S/ %.2f".format(it) } ?: "Consultar tarifa"
+
+                item { ProfileStaticSection("Días de Atención", diasAtencionTexto) }
+                item { ProfileStaticSection("Horario", horarioTexto) }
                 item { ProfileStaticSection("Tarifa por Consulta", costoFormatted) }
+                // --- FIN DE LA MODIFICACIÓN ---
+
                 item { ProfileStaticSection("Especialidad", professionalInfo.especialidad) }
                 item { ProfileStaticSection("Logros y Resumen", professionalInfo.logros) }
                 item { SectionTitle("Educación") }

@@ -18,7 +18,10 @@ data class LawyerProfile(
     val especialidad: String = "",
     val logros: String = "",
     val educacion: List<EducationItem> = emptyList(),
-    val experiencia: List<ExperienceItem> = emptyList()
+    val experiencia: List<ExperienceItem> = emptyList(),
+    val diasAtencion: List<String> = emptyList(),
+    val horarioInicio: String = "",
+    val horarioFin: String = ""
 )
 
 data class FullLawyerProfile(
