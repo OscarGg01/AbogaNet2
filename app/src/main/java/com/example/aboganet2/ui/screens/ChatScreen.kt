@@ -71,11 +71,21 @@ fun ChatScreen(
         authViewModel.listenForMessages(consultationId)
     }
 
+    val context = LocalContext.current // Necesitamos el contexto para obtener el nombre
+
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            authViewModel.sendFile(consultationId, it)
+        uri?.let { fileUri ->
+            // 1. Obtenemos el nombre del archivo a partir de la URI
+            val fileName = authViewModel.getFileName(context, fileUri)
+
+            // 2. Llamamos a la función sendFile, pero ahora también le pasamos el nombre
+            authViewModel.sendFile(
+                consultationId = consultationId,
+                fileUri = fileUri,
+                fileName = fileName ?: "Archivo adjunto" // Pasamos el nombre real
+            )
         }
     }
 
