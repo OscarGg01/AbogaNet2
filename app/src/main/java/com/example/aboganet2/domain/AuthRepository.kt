@@ -263,6 +263,23 @@ class AuthRepository {
         }
     }
 
+    suspend fun getMessages(consultationId: String): Result<List<Message>> {
+        return try {
+            val snapshot = firestore.collection("consultations")
+                .document(consultationId)
+                .collection("messages")
+                .orderBy("timestamp") // Ordenamos los mensajes por fecha
+                .get()
+                .await()
+
+            val messages = snapshot.toObjects(Message::class.java)
+            Result.success(messages)
+        } catch (e: Exception) {
+            Log.e("AuthRepository", "Error fetching messages for consultation $consultationId", e)
+            Result.failure(e)
+        }
+    }
+
     suspend fun updateConsultationStatus(consultationId: String, newStatus: String): Result<Unit> {
         return try {
             firestore.collection("consultations").document(consultationId)

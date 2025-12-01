@@ -341,14 +341,28 @@ fun CalendarHeader(currentMonth: YearMonth, onPrevMonth: () -> Unit, onNextMonth
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun DaysOfWeekHeader() {
-    Row(modifier = Modifier.fillMaxWidth()) {
-        val daysOfWeek = DayOfWeek.values()
-        val orderedDays = daysOfWeek.drop(1) + daysOfWeek.first()
-        for (dayOfWeek in orderedDays) {
+    // 1. Definimos explícitamente que nuestra semana empieza el Lunes.
+    val firstDayOfWeek = DayOfWeek.MONDAY
+
+    // 2. Creamos la lista de días en el orden correcto, empezando por el Lunes.
+    // Este código es robusto y siempre funcionará.
+    val daysOfWeek = DayOfWeek.values().let { allDays ->
+        val start = allDays.indexOf(firstDayOfWeek)
+        allDays.slice(start until allDays.size) + allDays.slice(0 until start)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp), // Añadimos un poco de espacio vertical para que respire
+        horizontalArrangement = Arrangement.SpaceAround // Asegura una distribución uniforme
+    ) {
+        for (dayOfWeek in daysOfWeek) {
             Text(
-                modifier = Modifier.weight(1f),
+                // Quitamos el modifier.weight(1f) para que Arrangement.SpaceAround funcione mejor
                 textAlign = TextAlign.Center,
-                text = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale("es", "ES")).replaceFirstChar { it.uppercase() },
+                text = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale("es", "ES"))
+                    .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
                 fontWeight = FontWeight.Bold
             )
         }

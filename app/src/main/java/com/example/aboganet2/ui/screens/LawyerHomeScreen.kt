@@ -1,5 +1,7 @@
 package com.example.aboganet2.ui.screens
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +42,7 @@ data class BottomNavItem(
     val unselectedIcon: ImageVector,
 )
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LawyerHomeScreen(
@@ -137,11 +140,11 @@ fun LawyerHomeScreen(
                         }
                     }
                 }
-                1 -> { // Placeholder para Agenda
-                    // Por ahora, no hacemos nada aquí. En el futuro, aquí iría la pantalla de Agenda.
+                1 -> {
+                    LawyerAgendaScreen(authViewModel = authViewModel)
                 }
-                2 -> { // Placeholder para Documentos
-                    // Por ahora, no hacemos nada aquí. En el futuro, aquí iría la pantalla de Documentos.
+                2 -> {
+                    LawyerDocumentsScreen(authViewModel = authViewModel)
                 }
             }
         }

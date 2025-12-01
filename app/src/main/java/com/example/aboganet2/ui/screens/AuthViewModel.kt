@@ -93,6 +93,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    suspend fun getMessagesForConsultation(consultationId: String): Result<List<Message>> {
+        return authRepository.getMessages(consultationId)
+    }
+
     fun fetchLawyerConsultations() {
         viewModelScope.launch {
             val lawyerId = getCurrentUserId() ?: return@launch
