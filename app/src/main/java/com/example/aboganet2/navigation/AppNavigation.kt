@@ -19,6 +19,7 @@ object AppRoutes {
     const val REGISTER_SCREEN = "register"
     const val CLIENT_HOME_SCREEN = "client_home"
     const val LAWYER_HOME_SCREEN = "lawyer_home"
+    const val LAWYER_CONSULTATION_DETAIL_SCREEN = "lawyer_consultation_detail"
     const val CLIENT_PROFILE_SCREEN = "client_profile"
     const val SPLASH_SCREEN = "splash"
     const val LAWYER_PROFILE_SCREEN = "lawyer_profile"
@@ -26,7 +27,9 @@ object AppRoutes {
     const val PAYMENT_SCREEN = "payment"
     const val CONSULTATION_SCREEN = "consultation"
     const val CONSULTATION_FORM_SCREEN = "consultation_form"
-    const val CHAT_SCREEN = "chat"
+    const val CHAT_SCREEN = "chat/{consultationId}"
+    const val MY_CONSULTATIONS_SCREEN = "my_consultations"
+    const val CONSULTATION_DETAIL_SCREEN = "consultation_detail"
 }
 
 @Composable
@@ -120,6 +123,9 @@ fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
                 },
                 onLawyerClick = { lawyerId ->
                     navController.navigate(AppRoutes.LAWYER_DETAIL_SCREEN + "/$lawyerId")
+                },
+                onMyConsultationsClick = {
+                    navController.navigate(AppRoutes.MY_CONSULTATIONS_SCREEN)
                 }
             )
         }
@@ -133,12 +139,35 @@ fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
 
         composable(route = AppRoutes.LAWYER_HOME_SCREEN) {
             LawyerHomeScreen(
+                authViewModel = authViewModel,
                 onProfileClick = { navController.navigate(AppRoutes.LAWYER_PROFILE_SCREEN) },
                 onLogoutClick = {
                     authViewModel.logout()
                     navController.navigate(AppRoutes.LOGIN_SCREEN) {
-                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        popUpTo(AppRoutes.LAWYER_HOME_SCREEN) { inclusive = true }
                     }
+                },
+                // --- MODIFICA ESTA LAMBDA ---
+                onConsultationClick = { consultationId ->
+                    // Navega a la pantalla de detalles pasando el ID
+                    navController.navigate("${AppRoutes.LAWYER_CONSULTATION_DETAIL_SCREEN}/$consultationId")
+                }
+            )
+        }
+
+        composable(
+            route = AppRoutes.LAWYER_CONSULTATION_DETAIL_SCREEN + "/{consultationId}",
+            arguments = listOf(navArgument("consultationId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val consultationId = backStackEntry.arguments?.getString("consultationId") ?: ""
+            LawyerConsultationDetailScreen(
+                consultationId = consultationId,
+                authViewModel = authViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onOpenChatClick = { consId, clientId ->
+                    // Navega a la pantalla de chat. La ruta ya está preparada para esto.
+                    // Pasamos el ID de la consulta para que el chat se cargue correctamente.
+                    navController.navigate("chat/$consId")
                 }
             )
         }
@@ -220,20 +249,53 @@ fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
                 cost = cost.toDouble(),
                 authViewModel = authViewModel,
                 onNavigateBack = { navController.popBackStack() },
-                onSubmissionSuccess = {
-                    navController.navigate(AppRoutes.CHAT_SCREEN) {
+                onSubmissionSuccess = { consultationId ->
+                    navController.navigate(AppRoutes.MY_CONSULTATIONS_SCREEN) {
                         popUpTo(AppRoutes.CLIENT_HOME_SCREEN)
                     }
+                    navController.navigate("chat/$consultationId")
                 }
             )
         }
 
-        composable(route = AppRoutes.CHAT_SCREEN) {
-            ChatScreen(onNavigateBack = {
-                navController.navigate(AppRoutes.CLIENT_HOME_SCREEN) {
-                    popUpTo(AppRoutes.CLIENT_HOME_SCREEN) { inclusive = true }
+        composable(
+            route = AppRoutes.CHAT_SCREEN,
+            arguments = listOf(navArgument("consultationId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val consultationId = backStackEntry.arguments?.getString("consultationId") ?: return@composable
+            ChatScreen(
+                consultationId = consultationId,
+                authViewModel = authViewModel,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(route = AppRoutes.MY_CONSULTATIONS_SCREEN) {
+            MyConsultationsScreen(
+                authViewModel = authViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onConsultationClick = { consultationId ->
+                    navController.navigate("${AppRoutes.CONSULTATION_DETAIL_SCREEN}/$consultationId")
                 }
-            })
+            )
+        }
+
+        composable(
+            route = AppRoutes.CONSULTATION_DETAIL_SCREEN + "/{consultationId}",
+            arguments = listOf(navArgument("consultationId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val consultationId = backStackEntry.arguments?.getString("consultationId") ?: ""
+            ConsultationDetailScreen(
+                consultationId = consultationId,
+                authViewModel = authViewModel,
+                onNavigateBack = { navController.popBackStack() },
+                onLawyerProfileClick = { lawyerId ->
+                    navController.navigate("${AppRoutes.LAWYER_DETAIL_SCREEN}/$lawyerId")
+                },
+                onOpenChatClick = { consId, lawId ->
+                    navController.navigate("chat/$consId")
+                }
+            )
         }
     }
 }

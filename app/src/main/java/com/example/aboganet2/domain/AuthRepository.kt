@@ -1,18 +1,26 @@
 package com.example.aboganet2.domain
 
-import androidx.compose.animation.core.copy
 import com.example.aboganet2.data.Consultation
 import com.example.aboganet2.data.FullLawyerProfile
 import com.example.aboganet2.data.LawyerProfile
 import com.example.aboganet2.data.User
+import com.example.aboganet2.data.Message
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.ktx.snapshots
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
+import android.net.Uri
+import com.google.firebase.storage.FirebaseStorage
+import java.util.UUID
 
 class AuthRepository {
 
     private val firebaseAuth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
+    private val storage = FirebaseStorage.getInstance()
 
     suspend fun getLawyerProfile(userId: String): Result<LawyerProfile> {
         return try {
@@ -27,7 +35,7 @@ class AuthRepository {
 
     suspend fun registerUser(user: User, password: String): Result<String> {
         return try {
-            val authResult = firebaseAuth.createUserWithEmailAndPassword( user. email,  password).await()
+            val authResult = firebaseAuth.createUserWithEmailAndPassword(user.email, password).await()
             val firebaseUser = authResult.user
 
             if (firebaseUser != null) {
@@ -44,13 +52,34 @@ class AuthRepository {
         }
     }
 
-    suspend fun submitConsultation(consultation: Consultation): Result<Unit> {
+    suspend fun getClientConsultations(clientId: String): Result<List<Consultation>> {
         return try {
-            // Creamos un nuevo documento en la colección 'consultations'
+            val snapshot = firestore.collection("consultations")
+                .whereEqualTo("clientId", clientId)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get()
+                .await()
+            val consultations = snapshot.toObjects(Consultation::class.java)
+            Result.success(consultations)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun getUserBasicInfo(userId: String): User? {
+        return try {
+            firestore.collection("users").document(userId).get().await().toObject(User::class.java)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    suspend fun submitConsultation(consultation: Consultation): Result<String> {
+        return try {
             val document = firestore.collection("consultations").document()
-            // Guardamos la consulta con el ID del documento asignado
-            document.set(consultation.copy(id = document.id)).await()
-            Result.success(Unit)
+            val consultationWithId = consultation.copy(id = document.id)
+            document.set(consultationWithId).await()
+            Result.success(document.id)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -82,6 +111,17 @@ class AuthRepository {
                 }
             }
             Result.success(activeLawyers)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateFinalCost(consultationId: String, finalCost: Double): Result<Unit> {
+        return try {
+            firestore.collection("consultations").document(consultationId)
+                .update("finalCost", finalCost)
+                .await()
+            Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -133,7 +173,7 @@ class AuthRepository {
                 firebaseAuth.signOut()
                 return null
             }
-            userDocument.getString("role")
+            userDocument.getString("rol")
         } catch (e: Exception) {
             null
         }
@@ -168,5 +208,62 @@ class AuthRepository {
 
     fun getCurrentUserId(): String? {
         return firebaseAuth.currentUser?.uid
+    }
+
+    suspend fun sendMessage(consultationId: String, message: Message): Result<Unit> {
+        return try {
+            firestore.collection("consultations").document(consultationId)
+                .collection("messages").add(message).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun getChatMessages(consultationId: String): Flow<List<Message>> {
+        return firestore.collection("consultations").document(consultationId)
+            .collection("messages")
+            .orderBy("timestamp")
+            .snapshots()
+            .map { snapshot ->
+                snapshot.toObjects(Message::class.java)
+            }
+    }
+
+    suspend fun getLawyerConsultations(lawyerId: String): Result<List<Consultation>> {
+        return try {
+            val snapshot = firestore.collection("consultations")
+                .whereEqualTo("lawyerId", lawyerId)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get()
+                .await()
+            val consultations = snapshot.toObjects(Consultation::class.java)
+            Result.success(consultations)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun updateConsultationStatus(consultationId: String, newStatus: String): Result<Unit> {
+        return try {
+            firestore.collection("consultations").document(consultationId)
+                .update("status", newStatus)
+                .await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun uploadFileToChat(consultationId: String, fileUri: Uri): Result<String> {
+        return try {
+            val fileName = UUID.randomUUID().toString()
+            val storageRef = storage.reference.child("chats/$consultationId/$fileName")
+            storageRef.putFile(fileUri).await()
+            val downloadUrl = storageRef.downloadUrl.await().toString()
+            Result.success(downloadUrl)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

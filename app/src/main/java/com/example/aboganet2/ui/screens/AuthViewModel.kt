@@ -1,12 +1,17 @@
 package com.example.aboganet2.ui.screens
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.net.Uri
+import android.webkit.MimeTypeMap
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aboganet2.data.Consultation
 import com.example.aboganet2.data.FullLawyerProfile
 import com.example.aboganet2.data.LawyerProfile
+import com.example.aboganet2.data.Message
 import com.example.aboganet2.data.User
 import com.example.aboganet2.domain.AuthRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -25,9 +30,16 @@ sealed class SessionState {
     object LoggedOut : SessionState()
 }
 
-class AuthViewModel : ViewModel() {
+sealed class SubmissionState {
+    object Idle : SubmissionState()
+    data class Success(val consultationId: String) : SubmissionState()
+    data class Error(val message: String) : SubmissionState()
+}
+
+class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val authRepository = AuthRepository()
+    private var messagesJob: Job? = null
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState
@@ -38,67 +50,92 @@ class AuthViewModel : ViewModel() {
     private val _userProfile = MutableStateFlow<User?>(null)
     val userProfile: StateFlow<User?> = _userProfile
 
-    private val _fullLawyerProfile = MutableStateFlow(FullLawyerProfile())
-    val fullLawyerProfile: StateFlow<FullLawyerProfile> = _fullLawyerProfile
-
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _fullLawyerProfile = MutableStateFlow(FullLawyerProfile())
+    val fullLawyerProfile: StateFlow<FullLawyerProfile> = _fullLawyerProfile
 
     private val _availableLawyers = MutableStateFlow<List<FullLawyerProfile>>(emptyList())
     val availableLawyers: StateFlow<List<FullLawyerProfile>> = _availableLawyers
 
-    private val _consultationState = MutableStateFlow<Boolean?>(null)
-    val consultationState: StateFlow<Boolean?> = _consultationState
+    private val _clientConsultations = MutableStateFlow<List<Pair<Consultation, User?>>>(emptyList())
+    val clientConsultations: StateFlow<List<Pair<Consultation, User?>>> = _clientConsultations
 
-    fun submitConsultation(consultation: Consultation) {
+    private val _lawyerConsultations = MutableStateFlow<List<Pair<Consultation, User?>>>(emptyList())
+    val lawyerConsultations: StateFlow<List<Pair<Consultation, User?>>> = _lawyerConsultations
+
+    private val _chatMessages = MutableStateFlow<List<Message>>(emptyList())
+    val chatMessages: StateFlow<List<Message>> = _chatMessages
+
+    private val _submissionState = MutableStateFlow<SubmissionState>(SubmissionState.Idle)
+    val submissionState: StateFlow<SubmissionState> = _submissionState
+
+    fun fetchClientConsultations() {
         viewModelScope.launch {
-            val result = authRepository.submitConsultation(consultation)
-            _consultationState.value = result.isSuccess
-        }
-    }
-
-    fun getCurrentUserId(): String? {
-        return authRepository.getCurrentUserId()
-    }
-
-    fun resetConsultationState() {
-        _consultationState.value = null
-    }
-
-    fun fetchFullLawyerProfile() {
-        val uid = authRepository.getCurrentUserId() ?: return
-        // Ahora llama a la nueva función con el ID del usuario actual
-        fetchLawyerProfileById(uid)
-    }
-
-    // CAMBIA EL NOMBRE DE ESTA FUNCIÓN
-    fun fetchLawyerProfileById(userId: String) {
-        viewModelScope.launch {
+            val clientId = getCurrentUserId() ?: return@launch
             _isLoading.value = true
-            _fullLawyerProfile.value = FullLawyerProfile() // Limpiamos el perfil anterior
-
-            val basicInfoResult = authRepository.getUserProfile(userId)
-            val professionalInfoResult = authRepository.getLawyerProfile(userId)
-
-            _fullLawyerProfile.value = FullLawyerProfile(
-                basicInfo = basicInfoResult.getOrNull(),
-                professionalInfo = professionalInfoResult.getOrNull()
-            )
+            val result = authRepository.getClientConsultations(clientId)
+            if (result.isSuccess) {
+                val consultations = result.getOrNull() ?: emptyList()
+                val newDetailedList = consultations.mapNotNull { consultation ->
+                    val lawyerInfo = authRepository.getUserBasicInfo(consultation.lawyerId)
+                    if (lawyerInfo != null) Pair(consultation, lawyerInfo) else null
+                }
+                _clientConsultations.value = newDetailedList
+            }
             _isLoading.value = false
         }
     }
 
-    fun saveLawyerProfile(profile: LawyerProfile) {
-        val uid = authRepository.getCurrentUserId() ?: return
-
+    fun fetchLawyerConsultations() {
         viewModelScope.launch {
+            val lawyerId = getCurrentUserId() ?: return@launch
             _isLoading.value = true
-            val result = authRepository.saveLawyerProfile(uid, profile)
-            result.onSuccess {
-                fetchFullLawyerProfile()
+            val result = authRepository.getLawyerConsultations(lawyerId)
+            if (result.isSuccess) {
+                val consultations = result.getOrNull() ?: emptyList()
+                val newDetailedList = consultations.mapNotNull { consultation ->
+                    val clientInfo = authRepository.getUserBasicInfo(consultation.clientId)
+                    if (clientInfo != null) Pair(consultation, clientInfo) else null
+                }
+                _lawyerConsultations.value = newDetailedList
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun submitConsultation(consultation: Consultation) {
+        viewModelScope.launch {
+            val result = authRepository.submitConsultation(consultation)
+            result.onSuccess { consultationId ->
+                fetchClientConsultations()
+                _submissionState.value = SubmissionState.Success(consultationId)
             }.onFailure {
+                _submissionState.value = SubmissionState.Error(it.message ?: "Error al enviar la consulta")
             }
         }
+    }
+
+    fun updateConsultationStatus(consultationId: String, newStatus: String) {
+        viewModelScope.launch {
+            authRepository.updateConsultationStatus(consultationId, newStatus).onSuccess {
+                fetchLawyerConsultations()
+            }
+        }
+    }
+
+    fun updateFinalCost(consultationId: String, finalCost: Double) {
+        viewModelScope.launch {
+            authRepository.updateFinalCost(consultationId, finalCost).onSuccess {
+                fetchLawyerConsultations()
+                fetchClientConsultations()
+            }
+        }
+    }
+
+    fun resetConsultationState() {
+        _submissionState.value = SubmissionState.Idle
     }
 
     fun checkActiveSession() {
@@ -115,8 +152,7 @@ class AuthViewModel : ViewModel() {
     fun login(email: String, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
-            val result = authRepository.loginUser(email, password)
-            result.onSuccess { role ->
+            authRepository.loginUser(email, password).onSuccess { role ->
                 _authState.value = AuthState.Success(role)
             }.onFailure {
                 _authState.value = AuthState.Error(it.message ?: "Error desconocido")
@@ -127,12 +163,7 @@ class AuthViewModel : ViewModel() {
     fun register(user: User, password: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
-            val result = authRepository.registerUser(user, password)
-            result.onSuccess { role ->
-                // --- CAMBIO CLAVE ---
-                // En lugar de emitir un estado de registro separado,
-                // emitimos el mismo estado de éxito que el login.
-                // La UI (AppNavigation) ya sabe cómo reaccionar a este estado.
+            authRepository.registerUser(user, password).onSuccess { role ->
                 _authState.value = AuthState.Success(role)
             }.onFailure {
                 _authState.value = AuthState.Error(it.message ?: "Error desconocido en el registro")
@@ -140,16 +171,25 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    fun logout() {
+        authRepository.logout()
+        _userProfile.value = null
+        _clientConsultations.value = emptyList()
+        _lawyerConsultations.value = emptyList()
+    }
+
+    fun resetAuthState() {
+        _authState.value = AuthState.Idle
+    }
+
+    fun getCurrentUserId(): String? {
+        return authRepository.getCurrentUserId()
+    }
+
     fun fetchUserProfile() {
         viewModelScope.launch {
-            val uid = authRepository.getCurrentUserId()
-            if (uid == null) {
-                _authState.value = AuthState.Error("No hay un usuario autenticado.")
-                return@launch
-            }
-
-            val result = authRepository.getUserProfile(uid)
-            result.onSuccess { user ->
+            val uid = authRepository.getCurrentUserId() ?: return@launch
+            authRepository.getUserProfile(uid).onSuccess { user ->
                 _userProfile.value = user
             }.onFailure {
                 _authState.value = AuthState.Error(it.message ?: "Error al cargar el perfil.")
@@ -157,11 +197,36 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    fun fetchFullLawyerProfile() {
+        val uid = authRepository.getCurrentUserId() ?: return
+        fetchLawyerProfileById(uid)
+    }
+
+    fun fetchLawyerProfileById(userId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val basicInfo = authRepository.getUserProfile(userId).getOrNull()
+            val profInfo = authRepository.getLawyerProfile(userId).getOrNull()
+            _fullLawyerProfile.value = FullLawyerProfile(basicInfo, profInfo)
+            _isLoading.value = false
+        }
+    }
+
+    fun saveLawyerProfile(profile: LawyerProfile) {
+        val uid = authRepository.getCurrentUserId() ?: return
+        viewModelScope.launch {
+            _isLoading.value = true
+            authRepository.saveLawyerProfile(uid, profile).onSuccess {
+                fetchFullLawyerProfile()
+            }
+            _isLoading.value = false
+        }
+    }
+
     fun updateUserProfilePicture(newUrl: String) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
-            val result = authRepository.updateProfilePictureUrl(newUrl)
-            result.onSuccess {
+            authRepository.updateProfilePictureUrl(newUrl).onSuccess {
                 fetchUserProfile()
                 _authState.value = AuthState.Idle
             }.onFailure {
@@ -173,22 +238,60 @@ class AuthViewModel : ViewModel() {
     fun fetchAllActiveLawyers() {
         viewModelScope.launch {
             _isLoading.value = true
-            // Llamamos a la nueva función del repositorio
-            val result = authRepository.getAllActiveLawyers()
-            result.onSuccess { lawyers ->
+            authRepository.getAllActiveLawyers().onSuccess { lawyers ->
                 _availableLawyers.value = lawyers
-            }.onFailure {
-                // Manejar el error
             }
             _isLoading.value = false
         }
     }
 
-    fun logout() {
-        authRepository.logout()
+    fun listenForMessages(consultationId: String) {
+        messagesJob?.cancel()
+        messagesJob = viewModelScope.launch {
+            authRepository.getChatMessages(consultationId).collect { messages ->
+                _chatMessages.value = messages
+            }
+        }
     }
 
-    fun resetAuthState() {
-        _authState.value = AuthState.Idle
+    fun sendMessage(consultationId: String, message: Message) {
+        viewModelScope.launch {
+            authRepository.sendMessage(consultationId, message)
+        }
+    }
+
+    fun sendMessage(consultationId: String, text: String) {
+        val senderId = getCurrentUserId() ?: return
+        val message = Message(senderId = senderId, text = text)
+        sendMessage(consultationId, message)
+    }
+
+    fun sendFile(consultationId: String, fileUri: Uri) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            val fileType = getMimeType(fileUri)
+            authRepository.uploadFileToChat(consultationId, fileUri).onSuccess { downloadUrl ->
+                val senderId = getCurrentUserId() ?: return@onSuccess
+                val message = Message(
+                    senderId = senderId,
+                    text = "Archivo adjunto",
+                    fileUrl = downloadUrl,
+                    fileType = fileType
+                )
+                sendMessage(consultationId, message)
+            }.onFailure {
+                // Manejar el error de subida
+            }
+            _isLoading.value = false
+        }
+    }
+
+    private fun getMimeType(uri: Uri): String? {
+        return getApplication<Application>().contentResolver.getType(uri)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        messagesJob?.cancel()
     }
 }

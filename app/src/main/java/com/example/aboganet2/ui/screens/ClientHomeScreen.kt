@@ -39,7 +39,8 @@ fun ClientHomeScreen(
     authViewModel: AuthViewModel = viewModel(),
     onProfileClick: () -> Unit,
     onLogoutClick: () -> Unit,
-    onLawyerClick: (String) -> Unit
+    onLawyerClick: (String) -> Unit,
+    onMyConsultationsClick: () -> Unit
 ) {
     val originalLawyerList by authViewModel.availableLawyers.collectAsState()
     val isLoading by authViewModel.isLoading.collectAsState()
@@ -105,6 +106,18 @@ fun ClientHomeScreen(
                 }
             )
 
+            // --- BOTÓN AÑADIDO ---
+            // Botón para navegar a la pantalla de "Mis Consultas"
+            Button(
+                onClick = onMyConsultationsClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text("Mis Consultas")
+            }
+            // --- FIN DEL BOTÓN AÑADIDO ---
+
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -112,7 +125,7 @@ fun ClientHomeScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp), // Ajuste de padding
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     items(filteredAndSortedLawyers) { lawyerProfile ->

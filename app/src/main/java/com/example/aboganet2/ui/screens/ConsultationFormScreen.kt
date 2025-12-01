@@ -11,7 +11,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aboganet2.data.Consultation
@@ -23,23 +22,34 @@ fun ConsultationFormScreen(
     cost: Double,
     authViewModel: AuthViewModel = viewModel(),
     onNavigateBack: () -> Unit,
-    onSubmissionSuccess: () -> Unit
+    onSubmissionSuccess: (String) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     val context = LocalContext.current
 
-    val consultationState by authViewModel.consultationState.collectAsState()
+    // --- LÍNEA CORREGIDA ---
+    // El estado correcto en el ViewModel es 'submissionState'
+    val submissionState by authViewModel.submissionState.collectAsState()
 
+    // --- LÓGICA DEL LAUNCHEDEFFECT CORREGIDA ---
     // Observador para reaccionar al resultado del guardado
-    LaunchedEffect(consultationState) {
-        if (consultationState == true) {
-            Toast.makeText(context, "Consulta enviada con éxito", Toast.LENGTH_LONG).show()
-            authViewModel.resetConsultationState() // Limpiar el estado
-            onSubmissionSuccess() // Navegar a la siguiente pantalla
-        } else if (consultationState == false) {
-            Toast.makeText(context, "Error al enviar la consulta", Toast.LENGTH_LONG).show()
-            authViewModel.resetConsultationState()
+    LaunchedEffect(submissionState) {
+        when (val state = submissionState) {
+            is SubmissionState.Success -> {
+                Toast.makeText(context, "Consulta enviada con éxito", Toast.LENGTH_LONG).show()
+                // Navega a la siguiente pantalla pasando el ID de la consulta
+                onSubmissionSuccess(state.consultationId)
+                // Limpiar el estado para no volver a activar este efecto
+                authViewModel.resetConsultationState()
+            }
+            is SubmissionState.Error -> {
+                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
+                authViewModel.resetConsultationState()
+            }
+            SubmissionState.Idle -> {
+                // No hacer nada
+            }
         }
     }
 

@@ -49,7 +49,7 @@ fun RegisterScreen(
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(value = telefono, onValueChange = { telefono = it }, label = { Text("Teléfono") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
         Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(value = direccion, onValueChange = { direccion = it }, label = { Text("Dirección (centro de trabajo)") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = direccion, onValueChange = { direccion = it }, label = { Text("Dirección (hogar/centro de trabajo)") }, modifier = Modifier.fillMaxWidth())
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Contraseña") }, modifier = Modifier.fillMaxWidth(), visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
         Spacer(modifier = Modifier.height(8.dp))
