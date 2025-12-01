@@ -220,14 +220,15 @@ fun LawyerProfileScreen(
     var editHorarioInicioNum by remember { mutableStateOf("") }
     var editHorarioInicioPeriod by remember { mutableStateOf("a.m.") }
     var editHorarioFinNum by remember { mutableStateOf("") }
-    var editHorarioFinPeriod by remember { mutableStateOf("a.m.") }
+    var editHorarioFinPeriod by remember { mutableStateOf("p.m.") }
 
     fun parseTime(timeString: String, onResult: (num: String, period: String) -> Unit) {
         if (timeString.isNotBlank()) {
             val parts = timeString.split(" ")
             if (parts.size == 2) {
-                val num = parts[0].replace(":", "")
-                val period = parts[1].lowercase(Locale.getDefault())
+                // **CAMBIO CLAVE**: Quitamos los dos puntos para que el estado solo contenga dígitos.
+                val num = parts[0].replace(":", "") // "09:30" -> "0930"
+                val period = if (parts[1].equals("AM", ignoreCase = true)) "a.m." else "p.m."
                 onResult(num, period)
             }
         }
@@ -277,15 +278,27 @@ fun LawyerProfileScreen(
                             // --- LÓGICA DE GUARDADO ACTUALIZADA ---
                             // La lógica de guardado no necesita cambiar, ya que trabaja con los números puros.
                             // Solo formateamos al final.
-                            fun formatTime(num: String): String {
-                                if (num.length < 2) return num
-                                val hour = num.substring(0, 2)
-                                val minute = if (num.length > 2) num.substring(2) else "00"
-                                return "$hour:$minute"
+                            fun formatTime(timeStr: String, period: String): String {
+                                // timeStr es una cadena de dígitos como "0930" o "430"
+                                if (timeStr.isBlank()) return ""
+
+                                // **CAMBIO CLAVE**: Rellenamos con ceros a la izquierda para asegurar 4 dígitos.
+                                // "430" -> "0430"
+                                val paddedTime = timeStr.padStart(4, '0')
+
+                                // Extraemos la hora y los minutos directamente de la cadena de dígitos.
+                                val hourStr = paddedTime.substring(0, 2)   // "0430" -> "04"
+                                val minuteStr = paddedTime.substring(2, 4) // "0430" -> "30"
+
+                                // Convertimos "a.m." -> "AM" y "p.m." -> "PM"
+                                val standardPeriod = if (period.equals("a.m.", ignoreCase = true)) "AM" else "PM"
+
+                                // Unimos todo para el formato final correcto: "04:30 PM"
+                                return "$hourStr:$minuteStr $standardPeriod"
                             }
 
-                            val finalHorarioInicio = if (editHorarioInicioNum.isNotBlank()) "${formatTime(editHorarioInicioNum)} ${editHorarioInicioPeriod}" else ""
-                            val finalHorarioFin = if (editHorarioFinNum.isNotBlank()) "${formatTime(editHorarioFinNum)} ${editHorarioFinPeriod}" else ""
+                            val finalHorarioInicio = formatTime(editHorarioInicioNum, editHorarioInicioPeriod)
+                            val finalHorarioFin = formatTime(editHorarioFinNum, editHorarioFinPeriod)
 
                             val updatedProfile = LawyerProfile(
                                 costoConsulta = costoConsultaInput.toDoubleOrNull(),

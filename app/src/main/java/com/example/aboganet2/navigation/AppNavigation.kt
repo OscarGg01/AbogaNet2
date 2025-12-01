@@ -1,6 +1,8 @@
 package com.example.aboganet2.navigation
 
+import android.os.Build
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -33,6 +35,7 @@ object AppRoutes {
     const val SCHEDULE_SCREEN = "schedule_screen"
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
     val navController = rememberNavController()
@@ -216,24 +219,26 @@ fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
                 lawyerName = lawyerName,
                 cost = cost,
                 onNavigateBack = { navController.popBackStack() },
-                onContinue = { contLawyerName, contLawyerId, contCost ->
-                    // Desde aquí, navegamos a la pantalla de pago
-                    navController.navigate("${AppRoutes.PAYMENT_SCREEN}/$contLawyerName/$contLawyerId/$contCost")
+                onContinue = { contLawyerName, contLawyerId, contCost, timestamp ->
+                    navController.navigate("${AppRoutes.PAYMENT_SCREEN}/$contLawyerName/$contLawyerId/$contCost/$timestamp")
                 }
             )
         }
 
         composable(
-            route = AppRoutes.PAYMENT_SCREEN + "/{lawyerName}/{lawyerId}/{cost}",
+            route = AppRoutes.PAYMENT_SCREEN + "/{lawyerName}/{lawyerId}/{cost}/{timestamp}",
             arguments = listOf(
                 navArgument("lawyerName") { type = NavType.StringType },
                 navArgument("lawyerId") { type = NavType.StringType },
-                navArgument("cost") { type = NavType.FloatType }
+                navArgument("cost") { type = NavType.FloatType },
+                navArgument("timestamp") { type = NavType.LongType }
             )
         ) { backStackEntry ->
             val lawyerName = backStackEntry.arguments?.getString("lawyerName") ?: ""
             val lawyerId = backStackEntry.arguments?.getString("lawyerId") ?: ""
             val cost = backStackEntry.arguments?.getFloat("cost") ?: 0f
+            val timestamp = backStackEntry.arguments?.getLong("timestamp") ?: 0L
+
             PaymentScreen(
                 lawyerName = lawyerName,
                 cost = cost.toDouble(),

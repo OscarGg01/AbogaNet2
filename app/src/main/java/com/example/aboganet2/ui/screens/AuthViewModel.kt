@@ -105,6 +105,18 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun getLawyerById(lawyerId: String, onResult: (FullLawyerProfile?) -> Unit) {
+        viewModelScope.launch {
+            val basicInfo = authRepository.getUserProfile(lawyerId).getOrNull()
+            val profInfo = authRepository.getLawyerProfile(lawyerId).getOrNull()
+            if (basicInfo != null && profInfo != null) {
+                onResult(FullLawyerProfile(basicInfo, profInfo))
+            } else {
+                onResult(null)
+            }
+        }
+    }
+
     fun submitConsultation(consultation: Consultation) {
         viewModelScope.launch {
             val result = authRepository.submitConsultation(consultation)

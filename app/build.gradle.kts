@@ -67,6 +67,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation("androidx.compose.material:material-icons-extended-android:1.6.7")
     implementation("com.google.firebase:firebase-storage-ktx")
+    implementation("com.kizitonwose.calendar:compose:2.4.0")
 
     implementation("io.coil-kt:coil-compose:2.6.0")
 }
