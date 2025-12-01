@@ -3,6 +3,7 @@ package com.example.aboganet2.ui.screens
 import android.app.Application
 import android.net.Uri
 import android.webkit.MimeTypeMap
+import com.google.firebase.Timestamp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.aboganet2.data.Consultation
@@ -70,6 +71,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _submissionState = MutableStateFlow<SubmissionState>(SubmissionState.Idle)
     val submissionState: StateFlow<SubmissionState> = _submissionState
+
+    suspend fun getBookedAppointments(lawyerId: String): List<Timestamp> {
+        return authRepository.getBookedAppointments(lawyerId)
+    }
 
     fun fetchClientConsultations() {
         viewModelScope.launch {

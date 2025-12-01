@@ -7,6 +7,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import com.google.firebase.Timestamp
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -46,10 +47,228 @@ import java.time.format.TextStyle
 import java.util.*
 
 @RequiresApi(Build.VERSION_CODES.O)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ScheduleScreen(
+    lawyerId: String,
+    lawyerName: String,
+    cost: Float,
+    authViewModel: AuthViewModel = viewModel(),
+    onNavigateBack: () -> Unit,
+    onContinue: (String, String, Float, Long) -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var lawyerFullProfile by remember { mutableStateOf<FullLawyerProfile?>(null) }
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+    var selectedTime by remember { mutableStateOf<LocalTime?>(null) }
+    var bookedAppointments by remember { mutableStateOf<List<Timestamp>>(emptyList()) }
+
+    val workingDaysOfWeek = remember(lawyerFullProfile) {
+        lawyerFullProfile?.professionalInfo?.diasAtencion?.mapNotNull { dayNameToDayOfWeek[it] } ?: emptyList()
+    }
+
+    LaunchedEffect(lawyerId) {
+        coroutineScope.launch {
+            authViewModel.getLawyerById(lawyerId) { profile ->
+                lawyerFullProfile = profile
+            }
+            val appointments = authViewModel.getBookedAppointments(lawyerId)
+            bookedAppointments = appointments
+        }
+    }
+
+    val timeSlots = remember(selectedDate, lawyerFullProfile, bookedAppointments) {
+        if (selectedDate == null || lawyerFullProfile == null) {
+            emptyList()
+        } else {
+            val allSlots = generateTimeSlots(
+                lawyerFullProfile?.professionalInfo?.horarioInicio ?: "",
+                lawyerFullProfile?.professionalInfo?.horarioFin ?: ""
+            )
+            val bookedSlotsForSelectedDate = bookedAppointments.mapNotNull { timestamp ->
+                val zonedDateTime = timestamp.toDate().toInstant().atZone(ZoneId.systemDefault())
+                if (zonedDateTime.toLocalDate().isEqual(selectedDate)) {
+                    zonedDateTime.toLocalTime()
+                } else {
+                    null
+                }
+            }.toSet()
+            val availableSlots = allSlots.filter { it !in bookedSlotsForSelectedDate }
+            if (selectedDate!!.isEqual(LocalDate.now())) {
+                val now = LocalTime.now()
+                availableSlots.filter { it.isAfter(now) }
+            } else {
+                availableSlots
+            }
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Seleccionar Horario", color = Color.White, fontWeight = FontWeight.Bold) },
+                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White) } },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
+            )
+        },
+        bottomBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(16.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (selectedDate != null && selectedTime != null) {
+                            val zoneId = ZoneId.systemDefault()
+                            val timestamp = selectedDate!!.atTime(selectedTime!!).atZone(zoneId).toInstant().toEpochMilli()
+                            onContinue(lawyerName, lawyerId, cost, timestamp)
+                        } else {
+                            Toast.makeText(context, "Por favor, seleccione un día y una hora", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = selectedDate != null && selectedTime != null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    Text("Continuar", fontSize = 18.sp)
+                }
+            }
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Componente del calendario que ahora recibe los días laborables
+            CalendarView(
+                workingDays = workingDaysOfWeek,
+                onDateSelected = { date ->
+                    selectedDate = date
+                    selectedTime = null
+                }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (selectedDate != null) {
+                Text(
+                    "Horas disponibles para ${selectedDate?.format(DateTimeFormatter.ofPattern("dd MMMM yyyy"))}",
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (timeSlots.isNotEmpty()) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 100.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(timeSlots) { time ->
+                            val isSelected = time == selectedTime
+                            TimeSlotItem(
+                                time = time,
+                                isSelected = isSelected,
+                                onTimeSelected = { selectedTime = it }
+                            )
+                        }
+                    }
+                } else {
+                    Text("No hay horas disponibles para este día.")
+                }
+            }
+        }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+private fun CalendarView(
+    workingDays: List<DayOfWeek>,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    val coroutineScope = rememberCoroutineScope()
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+
+    val currentMonth = remember { YearMonth.now() }
+    val startMonth = remember { currentMonth.minusMonths(100) }
+    val endMonth = remember { currentMonth.plusMonths(100) }
+    val firstDayOfWeek = remember { DayOfWeek.MONDAY }
+    val calendarState = rememberCalendarState(
+        startMonth = startMonth,
+        endMonth = endMonth,
+        firstVisibleMonth = currentMonth,
+        firstDayOfWeek = firstDayOfWeek
+    )
+
+    HorizontalCalendar(
+        modifier = Modifier.padding(vertical = 16.dp),
+        state = calendarState,
+        dayContent = { day ->
+            val isWorkingDay = day.date.dayOfWeek in workingDays
+            val isEnabled = day.date.isAfter(LocalDate.now().minusDays(1)) && isWorkingDay
+            Day(
+                day = day,
+                isSelected = selectedDate == day.date,
+                isEnabled = isEnabled,
+                onClick = {
+                    if (isEnabled) {
+                        selectedDate = it.date
+                        onDateSelected(it.date)
+                    }
+                }
+            )
+        },
+        monthHeader = { month ->
+            CalendarHeader(
+                currentMonth = month.yearMonth,
+                onPrevMonth = { coroutineScope.launch { calendarState.animateScrollToMonth(month.yearMonth.minusMonths(1)) } },
+                onNextMonth = { coroutineScope.launch { calendarState.animateScrollToMonth(month.yearMonth.plusMonths(1)) } }
+            )
+        }
+    )
+    DaysOfWeekHeader()
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun TimeSlotItem(time: LocalTime, isSelected: Boolean, onTimeSelected: (LocalTime) -> Unit) {
+    val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.getDefault())
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent)
+            .border(
+                1.dp,
+                if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
+                RoundedCornerShape(8.dp)
+            )
+            .clickable { onTimeSelected(time) }
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = time.format(formatter),
+            color = if (isSelected) Color.White else Color.Black,
+            fontSize = 14.sp
+        )
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
 private fun generateTimeSlots(start: String, end: String): List<LocalTime> {
     if (start.isBlank() || end.isBlank()) return emptyList()
     val slots = mutableListOf<LocalTime>()
-    // Este formateador espera "AM" o "PM", que es lo que ahora guardamos.
     val formatter = DateTimeFormatter.ofPattern("hh:mm a", Locale.US)
     try {
         var currentTime = LocalTime.parse(start, formatter)
@@ -59,7 +278,6 @@ private fun generateTimeSlots(start: String, end: String): List<LocalTime> {
             currentTime = currentTime.plusMinutes(30)
         }
     } catch (e: Exception) {
-        // Si algo falla, imprime el error en el Logcat para poder depurarlo.
         Log.e("generateTimeSlots", "Error al parsear las horas: '$start', '$end'", e)
         return emptyList()
     }
@@ -73,7 +291,6 @@ private val dayNameToDayOfWeek = mapOf(
     "Dom" to DayOfWeek.SUNDAY
 )
 
-// --- COMPONENTES DE LA UI DEL CALENDARIO ---
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun Day(day: CalendarDay, isSelected: Boolean, isEnabled: Boolean, onClick: (CalendarDay) -> Unit) {
@@ -134,176 +351,6 @@ fun DaysOfWeekHeader() {
                 text = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale("es", "ES")).replaceFirstChar { it.uppercase() },
                 fontWeight = FontWeight.Bold
             )
-        }
-    }
-}
-
-
-// --- PANTALLA PRINCIPAL ACTUALIZADA ---
-@RequiresApi(Build.VERSION_CODES.O)
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ScheduleScreen(
-    lawyerId: String,
-    lawyerName: String,
-    cost: Float,
-    authViewModel: AuthViewModel = viewModel(),
-    onNavigateBack: () -> Unit,
-    onContinue: (String, String, Float, Long) -> Unit
-) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-
-    var lawyerFullProfile by remember { mutableStateOf<FullLawyerProfile?>(null) }
-    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
-    var selectedTime by remember { mutableStateOf<LocalTime?>(null) }
-
-    val workingDaysOfWeek = remember(lawyerFullProfile) {
-        lawyerFullProfile?.professionalInfo?.diasAtencion?.mapNotNull { dayNameToDayOfWeek[it] } ?: emptyList()
-    }
-
-    // **CAMBIO CLAVE**: Ahora `timeSlots` es una lista que se recalcula cuando `selectedDate` cambia.
-    val timeSlots = remember(selectedDate, lawyerFullProfile) {
-        if (selectedDate == null || lawyerFullProfile == null) {
-            emptyList()
-        } else {
-            val allSlots = generateTimeSlots(
-                lawyerFullProfile?.professionalInfo?.horarioInicio ?: "",
-                lawyerFullProfile?.professionalInfo?.horarioFin ?: ""
-            )
-
-            // Si la fecha seleccionada es hoy, filtramos las horas que ya pasaron.
-            if (selectedDate!!.isEqual(LocalDate.now())) {
-                val now = LocalTime.now()
-                allSlots.filter { it.isAfter(now) }
-            } else {
-                // Si es un día futuro, mostramos todas las horas.
-                allSlots
-            }
-        }
-    }
-
-    LaunchedEffect(lawyerId) {
-        authViewModel.getLawyerById(lawyerId) { profile ->
-            lawyerFullProfile = profile
-        }
-    }
-
-    val currentMonth = remember { YearMonth.now() }
-    val startMonth = remember { currentMonth.minusMonths(100) }
-    val endMonth = remember { currentMonth.plusMonths(100) }
-    val firstDayOfWeek = remember { DayOfWeek.MONDAY }
-    val calendarState = rememberCalendarState(
-        startMonth = startMonth,
-        endMonth = endMonth,
-        firstVisibleMonth = currentMonth,
-        firstDayOfWeek = firstDayOfWeek
-    )
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Seleccionar Horario", color = Color.White, fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White) } },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
-            )
-        },
-        bottomBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background) // Opcional: para que no sea transparente
-                    .padding(16.dp)
-            ) {
-                Button(
-                    onClick = {
-                        if (selectedDate != null && selectedTime != null) {
-                            val zoneId = ZoneId.systemDefault()
-                            val timestamp = selectedDate!!.atTime(selectedTime!!).atZone(zoneId).toInstant().toEpochMilli()
-                            onContinue(lawyerName, lawyerId, cost, timestamp)
-                        } else {
-                            Toast.makeText(context, "Por favor, seleccione un día y una hora", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    enabled = selectedDate != null && selectedTime != null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                ) {
-                    Text("Continuar", fontSize = 18.sp)
-                }
-            }
-        }
-    ) { paddingValues ->
-        if (lawyerFullProfile == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                val visibleMonth = calendarState.firstVisibleMonth
-                CalendarHeader(
-                    currentMonth = visibleMonth.yearMonth,
-                    onPrevMonth = { coroutineScope.launch { calendarState.animateScrollToMonth(visibleMonth.yearMonth.minusMonths(1)) } },
-                    onNextMonth = { coroutineScope.launch { calendarState.animateScrollToMonth(visibleMonth.yearMonth.plusMonths(1)) } }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                DaysOfWeekHeader()
-                Spacer(modifier = Modifier.height(16.dp))
-
-                HorizontalCalendar(
-                    state = calendarState,
-                    dayContent = { day ->
-                        val isWorkingDay = day.date.dayOfWeek in workingDaysOfWeek
-                        val isTodayOrFuture = !day.date.isBefore(LocalDate.now())
-                        val isEnabled = isWorkingDay && isTodayOrFuture
-
-                        Day(day = day, isSelected = selectedDate == day.date, isEnabled = isEnabled) {
-                            selectedDate = it.date
-                            selectedTime = null
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                if (selectedDate != null) {
-                    Text("Horas Disponibles", style = MaterialTheme.typography.titleLarge)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    if (timeSlots.isEmpty()) {
-                        Text("No hay horas disponibles para este día.", color = Color.Gray)
-                    } else {
-                        LazyVerticalGrid(
-                            columns = GridCells.Adaptive(minSize = 100.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(timeSlots) { time ->
-                                val isSelected = time == selectedTime
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                                        .clickable { selectedTime = time }
-                                        .padding(vertical = 12.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = time.format(DateTimeFormatter.ofPattern("hh:mm a")),
-                                        color = if (isSelected) Color.White else LocalContentColor.current,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }

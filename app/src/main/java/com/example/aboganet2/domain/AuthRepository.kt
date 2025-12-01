@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import android.net.Uri
+import android.util.Log
+import com.google.firebase.Timestamp
 import com.google.firebase.storage.FirebaseStorage
 import java.util.UUID
 
@@ -63,6 +65,23 @@ class AuthRepository {
             Result.success(consultations)
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    suspend fun getBookedAppointments(lawyerId: String): List<Timestamp> {
+        return try {
+            // Consulta simplificada: solo filtramos por el ID del abogado
+            val snapshot = firestore.collection("consultations")
+                .whereEqualTo("lawyerId", lawyerId)
+                .get()
+                .await()
+
+            Log.d("AuthRepository", "Se encontraron ${snapshot.size()} citas para el abogado $lawyerId")
+            snapshot.documents.mapNotNull { it.getTimestamp("appointmentTimestamp") }
+        } catch (e: Exception) {
+            // Este Log es crucial, lo mantenemos
+            Log.e("AuthRepository", "Error fetching booked appointments", e)
+            emptyList()
         }
     }
 
@@ -234,10 +253,10 @@ class AuthRepository {
         return try {
             val snapshot = firestore.collection("consultations")
                 .whereEqualTo("lawyerId", lawyerId)
-                .orderBy("timestamp", Query.Direction.DESCENDING)
                 .get()
                 .await()
-            val consultations = snapshot.toObjects(Consultation::class.java)
+            var consultations = snapshot.toObjects(Consultation::class.java)
+            consultations = consultations.sortedByDescending { it.timestamp }
             Result.success(consultations)
         } catch (e: Exception) {
             Result.failure(e)
