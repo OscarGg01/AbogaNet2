@@ -31,7 +31,7 @@ fun LawyerDetailScreen(
     lawyerId: String,
     authViewModel: AuthViewModel = viewModel(),
     onNavigateBack: () -> Unit,
-    onNavigateToPayment: (String, String, Float) -> Unit
+    onNavigateToSchedule: (lawyerName: String, lawyerId: String, cost: Float) -> Unit
 ) {
     val fullProfile by authViewModel.fullLawyerProfile.collectAsState()
     var showConfirmationDialog by remember { mutableStateOf(false) }
@@ -83,7 +83,7 @@ fun LawyerDetailScreen(
                         Button(
                             onClick = {
                                 showConfirmationDialog = false
-                                onNavigateToPayment(
+                                onNavigateToSchedule(
                                     basicInfo.nombre,
                                     lawyerId, // Pasamos el ID del abogado
                                     professionalInfo.costoConsulta?.toFloat() ?: 0f

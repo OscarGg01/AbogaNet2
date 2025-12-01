@@ -30,6 +30,7 @@ object AppRoutes {
     const val CHAT_SCREEN = "chat/{consultationId}"
     const val MY_CONSULTATIONS_SCREEN = "my_consultations"
     const val CONSULTATION_DETAIL_SCREEN = "consultation_detail"
+    const val SCHEDULE_SCREEN = "schedule_screen"
 }
 
 @Composable
@@ -189,11 +190,37 @@ fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
                     lawyerId = lawyerId,
                     authViewModel = authViewModel,
                     onNavigateBack = { navController.popBackStack() },
-                    onNavigateToPayment = { lawyerName, lawyerIdArg, cost ->
-                        navController.navigate("${AppRoutes.PAYMENT_SCREEN}/$lawyerName/$lawyerIdArg/$cost")
+                    // 2. CAMBIAMOS EL DESTINO DE NAVEGACIÓN
+                    onNavigateToSchedule = { lawyerName, lawyerIdArg, cost ->
+                        // Navega a la nueva pantalla de horario
+                        navController.navigate("${AppRoutes.SCHEDULE_SCREEN}/$lawyerName/$lawyerIdArg/$cost")
                     }
                 )
             }
+        }
+
+        composable(
+            route = AppRoutes.SCHEDULE_SCREEN + "/{lawyerName}/{lawyerId}/{cost}",
+            arguments = listOf(
+                navArgument("lawyerName") { type = NavType.StringType },
+                navArgument("lawyerId") { type = NavType.StringType },
+                navArgument("cost") { type = NavType.FloatType }
+            )
+        ) { backStackEntry ->
+            val lawyerName = backStackEntry.arguments?.getString("lawyerName") ?: ""
+            val lawyerId = backStackEntry.arguments?.getString("lawyerId") ?: ""
+            val cost = backStackEntry.arguments?.getFloat("cost") ?: 0f
+
+            ScheduleScreen(
+                lawyerId = lawyerId,
+                lawyerName = lawyerName,
+                cost = cost,
+                onNavigateBack = { navController.popBackStack() },
+                onContinue = { contLawyerName, contLawyerId, contCost ->
+                    // Desde aquí, navegamos a la pantalla de pago
+                    navController.navigate("${AppRoutes.PAYMENT_SCREEN}/$contLawyerName/$contLawyerId/$contCost")
+                }
+            )
         }
 
         composable(
