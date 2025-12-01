@@ -67,11 +67,16 @@ fun LawyerConsultationDetailScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     // --- Detalles de la Consulta ---
                     Text(consultation.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    val formattedDate = consultation.timestamp?.toDate()?.let {
-                        SimpleDateFormat("dd 'de' MMMM 'de' yyyy, HH:mm 'hs'", Locale("es", "ES")).format(it)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    val appointmentDate = consultation.appointmentTimestamp?.toDate()?.let {
+                        SimpleDateFormat("dd 'de' MMMM 'de' yyyy, hh:mm a", Locale("es", "ES")).format(it)
+                    } ?: "Fecha por confirmar"
+                    InfoRow("Fecha de la Cita:", appointmentDate)
+                    val creationDate = consultation.timestamp?.toDate()?.let {
+                        SimpleDateFormat("dd/MM/yyyy", Locale("es", "ES")).format(it)
                     } ?: "N/A"
-                    Text("Recibido el: $formattedDate", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    InfoRow("Solicitud Recibida:", creationDate)
+
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(consultation.description, style = MaterialTheme.typography.bodyLarge)
                     Divider(modifier = Modifier.padding(vertical = 24.dp))

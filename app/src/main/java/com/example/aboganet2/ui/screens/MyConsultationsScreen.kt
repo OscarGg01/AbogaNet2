@@ -98,8 +98,9 @@ fun ConsultationCard(
                 style = MaterialTheme.typography.bodyMedium
             )
             Spacer(modifier = Modifier.height(4.dp))
+            val appointmentDate = consultation.appointmentTimestamp?.let { formatTimestamp(it) } ?: "Fecha no asignada"
             Text(
-                text = "Fecha: ${formatTimestamp(consultation.timestamp)}",
+                text = "Fecha de la Cita: $appointmentDate",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.Gray
             )

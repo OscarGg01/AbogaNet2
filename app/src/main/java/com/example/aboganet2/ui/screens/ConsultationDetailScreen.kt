@@ -62,7 +62,8 @@ fun ConsultationDetailScreen(
                     DetailItem("Título", consultation.title)
                     DetailItem("Descripción", consultation.description)
                     DetailItem("Estado", consultation.status.replaceFirstChar { it.uppercase() })
-                    DetailItem("Fecha de Creación", formatTimestamp(consultation.timestamp))
+                    DetailItem("Fecha y Hora de la Cita", formatTimestamp(consultation.appointmentTimestamp, includeTime = true))
+                    DetailItem("Fecha de Solicitud", formatTimestamp(consultation.timestamp))
 
                     Divider(modifier = Modifier.padding(vertical = 16.dp))
                     FinalCostDisplay(finalCost = consultation.finalCost)
@@ -167,8 +168,13 @@ private fun FinalCostDisplay(finalCost: Double?) {
     }
 }
 
-private fun formatTimestamp(timestamp: Timestamp?): String {
+private fun formatTimestamp(timestamp: Timestamp?, includeTime: Boolean = false): String {
     return timestamp?.toDate()?.let {
-        SimpleDateFormat("dd 'de' MMMM 'de' yyyy", Locale("es", "ES")).format(it)
-    } ?: "Fecha no disponible"
+        val pattern = if (includeTime) {
+            "dd 'de' MMMM 'de' yyyy, hh:mm a" // Formato con hora
+        } else {
+            "dd 'de' MMMM 'de' yyyy" // Formato solo fecha
+        }
+        SimpleDateFormat(pattern, Locale("es", "ES")).format(it)
+    } ?: "No disponible"
 }

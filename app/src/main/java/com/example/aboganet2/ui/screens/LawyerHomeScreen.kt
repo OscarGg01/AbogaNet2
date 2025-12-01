@@ -177,13 +177,14 @@ fun LawyerConsultationCard(
             )
             Spacer(modifier = Modifier.height(4.dp))
 
-            val formattedDate = consultation.timestamp?.toDate()?.let {
-                SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(it)
-            } ?: "Fecha no disponible"
+            val formattedDate = consultation.appointmentTimestamp?.toDate()?.let {
+                SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale("es", "ES")).format(it)
+            } ?: "Fecha por confirmar"
             Text(
-                text = "Fecha: $formattedDate",
+                text = "Fecha de la Cita: $formattedDate",
                 style = MaterialTheme.typography.bodyMedium
             )
+
             Spacer(modifier = Modifier.height(8.dp))
             Surface(
                 color = getStatusColor(consultation.status),
