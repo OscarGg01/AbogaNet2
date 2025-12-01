@@ -9,7 +9,7 @@ data class Consultation(
     val title: String = "",
     val description: String = "",
     val cost: Double = 0.0,
-    val status: String = "Pendiente",
+    val status: String = "pendiente",
     val timestamp: Timestamp = Timestamp.now(),
     val appointmentTimestamp: Timestamp? = null,
     val finalCost: Double? = null
