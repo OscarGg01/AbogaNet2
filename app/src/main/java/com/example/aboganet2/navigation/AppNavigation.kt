@@ -244,7 +244,8 @@ fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
                 cost = cost.toDouble(),
                 onNavigateBack = { navController.popBackStack() },
                 onPaymentSuccess = {
-                    navController.navigate("${AppRoutes.CONSULTATION_SCREEN}/$lawyerId/${cost.toDouble()}") {
+                    // CAMBIA ESTA LÍNEA
+                    navController.navigate("${AppRoutes.CONSULTATION_SCREEN}/$lawyerId/${cost.toDouble()}/$timestamp") {
                         popUpTo(AppRoutes.CLIENT_HOME_SCREEN)
                     }
                 }
@@ -252,33 +253,40 @@ fun AppNavigation(authViewModel: AuthViewModel = viewModel()) {
         }
 
         composable(
-            route = AppRoutes.CONSULTATION_SCREEN + "/{lawyerId}/{cost}",
+            route = AppRoutes.CONSULTATION_SCREEN + "/{lawyerId}/{cost}/{timestamp}",
             arguments = listOf(
                 navArgument("lawyerId") { type = NavType.StringType },
-                navArgument("cost") { type = NavType.FloatType }
+                navArgument("cost") { type = NavType.FloatType },
+                navArgument("timestamp") { type = NavType.LongType }
             )
         ) { backStackEntry ->
             val lawyerId = backStackEntry.arguments?.getString("lawyerId") ?: ""
             val cost = backStackEntry.arguments?.getFloat("cost") ?: 0f
+            val timestamp = backStackEntry.arguments?.getLong("timestamp") ?: 0L
+
             ConsultationScreen(
                 onGoToConsultation = {
-                    navController.navigate("${AppRoutes.CONSULTATION_FORM_SCREEN}/$lawyerId/${cost.toDouble()}")
+                    navController.navigate("${AppRoutes.CONSULTATION_FORM_SCREEN}/$lawyerId/${cost.toDouble()}/$timestamp")
                 }
             )
         }
 
         composable(
-            route = AppRoutes.CONSULTATION_FORM_SCREEN + "/{lawyerId}/{cost}",
+            route = AppRoutes.CONSULTATION_FORM_SCREEN + "/{lawyerId}/{cost}/{timestamp}", // Añade timestamp
             arguments = listOf(
                 navArgument("lawyerId") { type = NavType.StringType },
-                navArgument("cost") { type = NavType.FloatType }
+                navArgument("cost") { type = NavType.FloatType },
+                navArgument("timestamp") { type = NavType.LongType } // Añade el argumento
             )
         ) { backStackEntry ->
             val lawyerId = backStackEntry.arguments?.getString("lawyerId") ?: ""
             val cost = backStackEntry.arguments?.getFloat("cost") ?: 0f
+            val timestamp = backStackEntry.arguments?.getLong("timestamp") ?: 0L // Obtén el timestamp
+
             ConsultationFormScreen(
                 lawyerId = lawyerId,
                 cost = cost.toDouble(),
+                appointmentTimestamp = timestamp, // <-- ¡PASA EL VALOR AQUÍ!
                 authViewModel = authViewModel,
                 onNavigateBack = { navController.popBackStack() },
                 onSubmissionSuccess = { consultationId ->

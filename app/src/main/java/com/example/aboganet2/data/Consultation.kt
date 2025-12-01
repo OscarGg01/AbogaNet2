@@ -11,5 +11,6 @@ data class Consultation(
     val cost: Double = 0.0,
     val status: String = "Pendiente",
     val timestamp: Timestamp = Timestamp.now(),
+    val appointmentTimestamp: Timestamp? = null,
     val finalCost: Double? = null
 )

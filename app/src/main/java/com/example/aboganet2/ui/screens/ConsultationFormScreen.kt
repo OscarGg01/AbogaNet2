@@ -6,20 +6,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.aboganet2.data.Consultation
+import com.google.firebase.Timestamp
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConsultationFormScreen(
     lawyerId: String,
     cost: Double,
+    appointmentTimestamp: Long,
     authViewModel: AuthViewModel = viewModel(),
     onNavigateBack: () -> Unit,
     onSubmissionSuccess: (String) -> Unit
@@ -28,19 +29,13 @@ fun ConsultationFormScreen(
     var description by remember { mutableStateOf("") }
     val context = LocalContext.current
 
-    // --- LÍNEA CORREGIDA ---
-    // El estado correcto en el ViewModel es 'submissionState'
     val submissionState by authViewModel.submissionState.collectAsState()
 
-    // --- LÓGICA DEL LAUNCHEDEFFECT CORREGIDA ---
-    // Observador para reaccionar al resultado del guardado
     LaunchedEffect(submissionState) {
         when (val state = submissionState) {
             is SubmissionState.Success -> {
                 Toast.makeText(context, "Consulta enviada con éxito", Toast.LENGTH_LONG).show()
-                // Navega a la siguiente pantalla pasando el ID de la consulta
                 onSubmissionSuccess(state.consultationId)
-                // Limpiar el estado para no volver a activar este efecto
                 authViewModel.resetConsultationState()
             }
             is SubmissionState.Error -> {
@@ -100,7 +95,8 @@ fun ConsultationFormScreen(
                         lawyerId = lawyerId,
                         title = title,
                         description = description,
-                        cost = cost
+                        cost = cost,
+                        appointmentTimestamp = Timestamp(Date(appointmentTimestamp))
                     )
                     authViewModel.submitConsultation(newConsultation)
                 },

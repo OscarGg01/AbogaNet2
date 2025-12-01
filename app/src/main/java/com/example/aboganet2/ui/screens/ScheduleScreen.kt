@@ -207,6 +207,32 @@ fun ScheduleScreen(
                 navigationIcon = { IconButton(onClick = onNavigateBack) { Icon(Icons.Default.ArrowBack, "Volver", tint = Color.White) } },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.primary)
             )
+        },
+        bottomBar = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background) // Opcional: para que no sea transparente
+                    .padding(16.dp)
+            ) {
+                Button(
+                    onClick = {
+                        if (selectedDate != null && selectedTime != null) {
+                            val zoneId = ZoneId.systemDefault()
+                            val timestamp = selectedDate!!.atTime(selectedTime!!).atZone(zoneId).toInstant().toEpochMilli()
+                            onContinue(lawyerName, lawyerId, cost, timestamp)
+                        } else {
+                            Toast.makeText(context, "Por favor, seleccione un día y una hora", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = selectedDate != null && selectedTime != null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                ) {
+                    Text("Continuar", fontSize = 18.sp)
+                }
+            }
         }
     ) { paddingValues ->
         if (lawyerFullProfile == null) {
@@ -276,26 +302,6 @@ fun ScheduleScreen(
                             }
                         }
                     }
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                Button(
-                    onClick = {
-                        if (selectedDate != null && selectedTime != null) {
-                            val zoneId = ZoneId.systemDefault()
-                            val timestamp = selectedDate!!.atTime(selectedTime!!).atZone(zoneId).toInstant().toEpochMilli()
-                            onContinue(lawyerName, lawyerId, cost, timestamp)
-                        } else {
-                            Toast.makeText(context, "Por favor, seleccione un día y una hora", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    enabled = selectedDate != null && selectedTime != null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                ) {
-                    Text("Continuar", fontSize = 18.sp)
                 }
             }
         }
